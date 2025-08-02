@@ -1,137 +1,112 @@
 import streamlit as st
-import matplotlib.pyplot as plt
-import time
+import pandas as pd
+import random
 
-# Streamlit Page Config
-st.set_page_config(page_title="8-Cell Battery Dashboard", layout="wide")
+# ------------------- ⚙️ Page Configuration -------------------
+st.set_page_config(
+    page_title="Battery Dashboard",
+    page_icon="🔋",
+    layout="wide"
+)
 
-# Battery cell profiles
-BATTERY_PROFILES = {
-    "Li-ion": {"capacity": 3000, "voltage": 3.7},
-    "NiMH": {"capacity": 2000, "voltage": 1.2},
-    "Lead-Acid": {"capacity": 5000, "voltage": 2.0}
-}
+st.markdown("""
+    <h1 style='text-align: center; color: #4CAF50;'>🔋 Battery Cell Monitoring Dashboard</h1>
+    <p style='text-align: center;'>Real-time simulated data with interactive controls and insights.</p>
+""", unsafe_allow_html=True)
 
-NUM_CELLS = 8
+# ------------------- 🧪 Sidebar Configuration -------------------
+def configure_sidebar():
+    st.sidebar.header("🧪 Configure Cells")
+    available_types = ["LFP", "NMC", "NCA", "LMO", "LTO", "NiMH", "Lead-Acid"]
+    selected_cells = []
 
-# Initialize session state for each cell
-for i in range(NUM_CELLS):
-    if f"cell_{i}_level" not in st.session_state:
-        st.session_state[f"cell_{i}_level"] = 50
-    if f"cell_{i}_x" not in st.session_state:
-        st.session_state[f"cell_{i}_x"] = []
-    if f"cell_{i}_y" not in st.session_state:
-        st.session_state[f"cell_{i}_y"] = []
-
-# Sidebar controls
-st.sidebar.title("🔧 Global Simulation Controls")
-simulation_speed = st.sidebar.slider("⏱️ Speed (lower = faster)", 0.01, 0.5, 0.1)
-run_sim = st.sidebar.checkbox("▶️ Run Simulation")
-
-# Page Title
-st.title("🔋 8-Cell Battery Charging/Discharging Dashboard")
-st.caption("Each cell can be individually configured. The dashboard updates in real-time as cells charge or discharge.")
-
-# Layout: 4 columns for 8 cells
-cell_columns = st.columns(4)
-
-for i in range(NUM_CELLS):
-    col = cell_columns[i % 4]
-
-    with col:
-        st.markdown(f"### 🔌 Cell {i + 1}")
-
-        battery_type = st.selectbox(
-            f"Battery Type - Cell {i+1}",
-            list(BATTERY_PROFILES.keys()),
-            key=f"type_{i}"
+    for i in range(8):
+        selected = st.sidebar.selectbox(
+            f"Select type for Cell {i+1}",
+            options=[""] + available_types,
+            key=f"cell_{i}"
         )
+        if selected:
+            selected_cells.append(selected.lower())
 
-        mode = st.radio(
-            f"Mode - Cell {i+1}",
-            ["Charging", "Discharging"],
-            key=f"mode_{i}",
-            horizontal=True
-        )
+    # Remove duplicates and empty entries
+    selected_cells = list(dict.fromkeys([c for c in selected_cells if c.strip() != ""]))
+    return selected_cells
 
-        # Get battery profile
-        profile = BATTERY_PROFILES[battery_type]
-        level_key = f"cell_{i}_level"
-        level = st.session_state[level_key]
+# ------------------- 🛠️ Simulate Cell Data -------------------
+def generate_cell_data(cell_selection):
+    data = []
+    for idx, cell_type in enumerate(cell_selection, start=1):
+        voltage = 3.2 if cell_type == "lfp" else 3.6
+        current = round(random.uniform(0.5, 5.0), 2)
+        temp = round(random.uniform(25, 40), 1)
+        capacity = round(voltage * current, 2)
 
-        # Run simulation logic
-        if run_sim:
-            if mode == "Charging" and level < 100:
-                st.session_state[level_key] += 1
-            elif mode == "Discharging" and level > 0:
-                st.session_state[level_key] -= 1
-            level = st.session_state[level_key]
+        data.append({
+            "Cell ID": f"Cell_{idx}",
+            "Type": cell_type.upper(),
+            "🔋 Voltage (V)": voltage,
+            "⚡ Current (A)": current,
+            "🌡️ Temp (°C)": temp,
+            "⚙️ Capacity (Wh)": capacity
+        })
+    return pd.DataFrame(data)
 
-            # Update plot data
-            st.session_state[f"cell_{i}_x"].append(len(st.session_state[f"cell_{i}_x"]))
-            st.session_state[f"cell_{i}_y"].append(level)
+# ------------------- 📊 Display Dashboard Metrics -------------------
+def show_metrics(df):
+    st.markdown("## 📊 Key Metrics Overview")
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("🔋 Avg Voltage", f"{df['🔋 Voltage (V)'].mean():.2f} V")
+    col2.metric("⚡ Avg Current", f"{df['⚡ Current (A)'].mean():.2f} A")
+    col3.metric("🌡️ Avg Temp", f"{df['🌡️ Temp (°C)'].mean():.1f} °C")
+    col4.metric("⚙️ Total Capacity", f"{df['⚙️ Capacity (Wh)'].sum():.2f} Wh")
 
-        # Battery level color
-        if level > 75:
-            color = "🟢"
-        elif level > 35:
-            color = "🟡"
-        else:
-            color = "🔴"
+# ------------------- 📋 Show Data Table -------------------
+def show_data_table(df):
+    st.markdown("## 📋 Detailed Cell Data")
+    st.dataframe(df, use_container_width=True)
 
-        st.markdown(f"**{color} Charge Level: {level}%**")
-        st.progress(level / 100)
+# ------------------- 📈 Charts -------------------
+def show_charts(df):
+    st.markdown("## 📈 Visual Insights")
+    chart1, chart2 = st.columns(2)
 
-        # Plot battery charge
-        fig, ax = plt.subplots(figsize=(3, 1.2))
-        ax.plot(st.session_state[f"cell_{i}_x"], st.session_state[f"cell_{i}_y"],
-                color='green' if mode == "Charging" else 'red')
-        ax.set_ylim(0, 100)
-        ax.set_xticks([])
-        ax.set_yticks([])
-        ax.set_facecolor("#f9f9f9")
-        fig.patch.set_alpha(0)
-        st.pyplot(fig)
+    with chart1:
+        st.subheader("🌡️ Temperature by Cell")
+        st.bar_chart(df.set_index("Cell ID")["🌡️ Temp (°C)"])
 
-        st.markdown(f"**Voltage**: `{profile['voltage']} V`  |  **Capacity**: `{profile['capacity']} mAh`")
-        import pandas as pd
-import io
+    with chart2:
+        st.subheader("⚙️ Capacity Distribution")
+        st.bar_chart(df.set_index("Cell ID")["⚙️ Capacity (Wh)"])
 
-# Button in the sidebar to download CSV
-st.sidebar.markdown("---")
-st.sidebar.title("📤 Export Data")
-if st.sidebar.button("Download CSV"):
-    # Gather data from session_state
-    rows = []
-    for i in range(NUM_CELLS):
-        times = st.session_state[f"cell_{i}_x"]
-        levels = st.session_state[f"cell_{i}_y"]
-        battery_type = st.session_state.get(f"type_{i}", "Unknown")
-        mode = st.session_state.get(f"mode_{i}", "Unknown")
-        profile = BATTERY_PROFILES.get(battery_type, {"voltage": None, "capacity": None})
-        for t, level in zip(times, levels):
-            rows.append({
-                "Cell": i + 1,
-                "Time Step": t,
-                "Charge Level (%)": level,
-                "Battery Type": battery_type,
-                "Mode": mode,
-                "Voltage (V)": profile["voltage"],
-                "Capacity (mAh)": profile["capacity"]
-            })
-
-    # Create DataFrame
-    df = pd.DataFrame(rows)
-
-    # Convert to CSV buffer
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
-
-    # Download button
+# ------------------- 📥 CSV Export -------------------
+def download_csv(df):
+    csv = df.to_csv(index=False).encode("utf-8")
     st.download_button(
-        label="📥 Download Simulation CSV",
-        data=csv_buffer.getvalue_
+        label="📥 Download CSV",
+        data=csv,
+        file_name="battery_cell_data.csv",
+        mime="text/csv"
     )
 
+# ------------------- 🚀 Main App Logic -------------------
+def main():
+    cell_selection = configure_sidebar()
 
+    if st.sidebar.button("🚀 Generate Dashboard"):
+        if not cell_selection:
+            st.warning("⚠️ Please select at least one valid cell type.")
+            return
 
+        df = generate_cell_data(cell_selection)
+        show_metrics(df)
+        show_data_table(df)
+        show_charts(df)
+        download_csv(df)
+        st.success("✅ Dashboard generated successfully!")
+    else:
+        st.info("ℹ️ Select cell types from the sidebar and click 'Generate Dashboard' to begin.")
+
+# ------------------- 🔄 Run App -------------------
+if __name__ == "__main__":
+    main()
