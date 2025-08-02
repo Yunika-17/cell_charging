@@ -94,5 +94,43 @@ for i in range(NUM_CELLS):
         st.pyplot(fig)
 
         st.markdown(f"**Voltage**: `{profile['voltage']} V`  |  **Capacity**: `{profile['capacity']} mAh`")
+        import pandas as pd
+import io
+
+# Button in the sidebar to download CSV
+st.sidebar.markdown("---")
+st.sidebar.title("📤 Export Data")
+if st.sidebar.button("Download CSV"):
+    # Gather data from session_state
+    rows = []
+    for i in range(NUM_CELLS):
+        times = st.session_state[f"cell_{i}_x"]
+        levels = st.session_state[f"cell_{i}_y"]
+        battery_type = st.session_state.get(f"type_{i}", "Unknown")
+        mode = st.session_state.get(f"mode_{i}", "Unknown")
+        profile = BATTERY_PROFILES.get(battery_type, {"voltage": None, "capacity": None})
+        for t, level in zip(times, levels):
+            rows.append({
+                "Cell": i + 1,
+                "Time Step": t,
+                "Charge Level (%)": level,
+                "Battery Type": battery_type,
+                "Mode": mode,
+                "Voltage (V)": profile["voltage"],
+                "Capacity (mAh)": profile["capacity"]
+            })
+
+    # Create DataFrame
+    df = pd.DataFrame(rows)
+
+    # Convert to CSV buffer
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
+
+    # Download button
+    st.download_button(
+        label="📥 Download Simulation CSV",
+        data=csv_buffer.getvalue_
+
 
 
