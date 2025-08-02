@@ -131,6 +131,7 @@ if st.sidebar.button("Download CSV"):
     st.download_button(
         label="📥 Download Simulation CSV",
         data=csv_buffer.getvalue_
+    )
 
 
 
